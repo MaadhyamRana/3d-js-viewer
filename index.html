@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<head>
+<title>WebGL Point Cloud Viewer</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+<style>
+body {
+    color: #cccccc;
+    font-family:Monospace;
+    font-size:13px;
+    text-align:center;
+    background-color: #050505;
+    margin: 0px;
+    overflow: hidden;
+}
+
+b-ctrl { color:orange }
+</style>
+
+</head>
+
+
+<body>
+
+<!-- Head info -->
+<div id="info-controls">Point Cloud Viewer
+<br>
+<b-ctrl>Left-click</b-ctrl> to rotate, <b-ctrl>Right-click</b-ctrl> to translate, <b-ctrl>Scroll|Middle-click</b-ctrl> to zoom
+</div>
+
+
+<!-- Visualizer -->
+<div id="container"></div>
+
+
+<!-- Scripts -->
+<script src="three.js"></script>
+<script src="trackball.js"></script>
+<script>
+
+var container, stats;
+var camera, scene, renderer;
+var controls;
+var points;
+
+// initialize scene, the renderer and the camera
+function init() {
+	container = document.getElementById( 'container' );
+	camera = new THREE.PerspectiveCamera(27, window.innerWidth / window.innerHeight, 5, 3500);
+	camera.position.z = 50;
+	scene = new THREE.Scene();
+	scene.fog = new THREE.Fog( 0x050505, 2000, 3500 );
+
+	renderer = new THREE.WebGLRenderer( { antialias: false } );
+	renderer.setClearColor( scene.fog.color );
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( window.innerWidth, window.innerHeight );
+
+	container.appendChild( renderer.domElement );
+	controls = new THREE.TrackballControls( camera, renderer.domElement );
+	controls.zoomSpeed = -0.2;
+
+	fetchFile("files/demo", function(text) {
+		if (text === null) {
+			console.log("Error: file cannot be loaded");
+		}
+		else {
+			drawCloud(text);
+		}
+	});
+
+	window.addEventListener('resize', onWindowResize, false );
+}
+
+// helper to conver hsv to rgb color scale
+function hsvToRgb(h, s, v) {
+	h=h/360
+
+	if (s === 0.0) {
+		return [v, v, v]
+	}
+
+	var i = parseInt(h*6)
+	var f = (h*6)-i
+	var p = (v*(1-s))
+	var q = (v*(1-s*f))
+	var t = (v*(1-s*(1-f)))
+	i%=6
+
+	switch (i) {
+		case 0:
+			return [v, t, p]
+			break;
+		case 1:
+			return [q, v, p]
+			break;
+		case 2:
+			return [p, v, t]
+			break;
+		case 3:
+			return [p, q, v]
+			break;
+		case 4:
+			return [t, p, v]
+			break;
+		case 5:
+			return [v, p, q]
+			break;
+	}
+}
+
+// draw the point cloud
+function drawCloud(data) {
+	var rows = data.split("\n");
+	var particles = rows.length - 1;
+	var geometry = new THREE.Geometry();
+
+	for ( var i = 0; i < particles; i++ ) {
+		r = rows[i].toString();
+		var coord = r.split(" ");
+
+		// coords pushed onto geometry
+		var x = coord[0];
+		var y = coord[1];
+		var z = coord[2];
+		geometry.vertices.push(new THREE.Vector3(x,y,z));
+
+		// configure colors here
+		var colors = hsvToRgb(240,1,0.5);
+		geometry.colors.push(new THREE.Color(colors[0], colors[1], colors[2]));
+	}
+
+	var pmaterial = new THREE.PointCloudMaterial({vertexColors:THREE.VertexColors,size: 0.6});
+	var cloud = new THREE.PointCloud(geometry,pmaterial);
+
+	scene.add(cloud);
+}
+
+// fetch file using xhr
+function fetchFile(url, doneCallback) {
+	var xhr;
+    xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = handleStateChange;
+    xhr.open("GET", url, true);
+    xhr.send();
+	
+    function handleStateChange() {
+		if (xhr.readyState === 4) {
+			doneCallback(xhr.status == 200 ? xhr.responseText : null);
+        }
+    }
+}
+
+// handle aspect ratio when resizing window
+function onWindowResize() {
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize( window.innerWidth, window.innerHeight );
+}
+
+// animation loop
+function animate() {
+	requestAnimationFrame( animate );
+	controls.update();
+	renderer.render( scene, camera );
+}
+
+init();
+animate();
+
+</script>
+</body>
+</html>
